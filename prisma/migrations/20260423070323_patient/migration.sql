@@ -8,8 +8,8 @@ CREATE TABLE "patient" (
     "address" TEXT,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
     "deleteAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updateAt" TIMESTAMP(3) NOT NULL,
     "userId" TEXT NOT NULL,
 
     CONSTRAINT "patient_pkey" PRIMARY KEY ("id")

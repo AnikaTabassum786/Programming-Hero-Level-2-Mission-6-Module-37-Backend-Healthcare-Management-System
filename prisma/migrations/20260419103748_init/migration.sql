@@ -4,7 +4,7 @@ CREATE TABLE "specialties" (
     "title" VARCHAR(100) NOT NULL,
     "description" TEXT,
     "icon" VARCHAR(255),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated" TIMESTAMP(3) NOT NULL,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
     "deletedAt" TIMESTAMP(3),

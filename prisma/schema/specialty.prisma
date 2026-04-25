@@ -8,12 +8,26 @@ model Specialty{
   icon String? @db.VarChar(255)
 
   createdAt DateTime @default(now())
-  updated DateTime @updatedAt
+updatedAt DateTime @updatedAt
 
   isDeleted Boolean @default(false)
   deletedAt DateTime?
+  doctorSpecialties DoctorSpecialty[]
 
   @@index([isDeleted],name: "idx_specialty_isDeleted") //This makes filtering deleted vs non-deleted data much faster.
   @@index([title], name:"idx_specialty_title")
   @@map("specialties") // In the database, this table name will be specialties, not Specialty.
+}
+
+model DoctorSpecialty{
+  id String @id @default(uuid(7))
+  doctorId String 
+  specialtyId String
+  doctor Doctor @relation(fields: [doctorId],references:[id],onDelete: Cascade,onUpdate: Cascade)
+  specialty Specialty @relation(fields: [specialtyId],references: [id], onDelete: Cascade,onUpdate: Cascade)
+
+  @@unique([doctorId,specialtyId])
+  @@index([doctorId],name:"idx_doctor_specialty_doctorId")
+  @@index([specialtyId],name:"idx_doctor_specialty_specialtyId")
+  @@map("doctor_specialties")
 }
