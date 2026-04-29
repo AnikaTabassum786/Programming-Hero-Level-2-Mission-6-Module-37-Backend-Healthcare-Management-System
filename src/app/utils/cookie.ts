@@ -7,7 +7,7 @@ const setCookie =(res:Response,key:string,values:string,options:CookieOptions)=>
 }
 
 const getCookie=(req:Request,key:string)=>{
-    return req.cookies([key])
+    return req.cookies[key]
 }
 
 const clearCookie =(res:Response,key:string,options:CookieOptions)=>{
