@@ -15,6 +15,17 @@ const getAllDoctors = async()=>{
     return doctors
 }
 
+const getDoctorById = async(doctorId:string)=>{
+  const doctor = await prisma.doctor.findUnique({
+    where:{
+      id:doctorId
+    }
+  })
+
+  return doctor
+}
+
 export const DoctorService={
-   getAllDoctors 
+   getAllDoctors ,
+   getDoctorById
 }
