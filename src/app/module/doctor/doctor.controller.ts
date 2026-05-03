@@ -32,8 +32,24 @@ const getDoctorById = catchAsync(async(req:Request,res:Response)=>{
     return result
 })
 
+const deleteDoctor= catchAsync(async(req:Request,res:Response)=>{
+  const {doctorId} = req.params
+
+  const result = await DoctorService.deleteDoctor(doctorId as string);
+
+    sendResponse(res,{
+        httpStatusCode:status.OK,
+        success:true,
+        message:"Doctor Deleted Successfully",
+        data:result
+    })
+
+    return result
+})
+
 export const DoctorController={
    getAllDoctors ,
-   getDoctorById
+   getDoctorById,
+   deleteDoctor
 }
 
