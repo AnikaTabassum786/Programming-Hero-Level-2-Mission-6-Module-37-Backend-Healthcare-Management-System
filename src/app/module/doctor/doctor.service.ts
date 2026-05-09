@@ -1,3 +1,4 @@
+import { Doctor } from "../../../generated/prisma/client"
 import { prisma } from "../../lib/prisma"
 
 
@@ -35,8 +36,31 @@ const deleteDoctor= async(doctorId:string)=>{
   return doctor
 }
 
+const updateDoctor = async(doctorId:string,payload: Partial<Doctor>)=>{
+  const existingDoctor = await prisma.doctor.findFirst({
+    where:{
+      id:doctorId,
+      isDeleted:false,
+    }
+  })
+
+  if (!existingDoctor){
+    throw new Error("Doctor not found")
+  }
+
+  const result = await prisma.doctor.update({
+    where:{
+      id:doctorId
+    },
+    data:payload
+  })
+
+  return result
+}
+
 export const DoctorService={
    getAllDoctors,
    getDoctorById,
-   deleteDoctor
+   deleteDoctor,
+   updateDoctor
 }
