@@ -1,5 +1,7 @@
-import { Doctor } from "../../../generated/prisma/client"
+
 import { prisma } from "../../lib/prisma"
+
+import { Prisma } from "../../../generated/prisma/client"
 
 
 const getAllDoctors = async()=>{
@@ -19,8 +21,30 @@ const getAllDoctors = async()=>{
 const getDoctorById = async(doctorId:string)=>{
   const doctor = await prisma.doctor.findUnique({
     where:{
-      id:doctorId
-    }
+      id:doctorId,
+      isDeleted:false,
+    },
+     include: {
+            user: true,
+            specialties: {
+                include: {
+                    specialty: true
+                }
+            },
+            appointments: {
+                include: {
+                    patient: true,
+                    schedule: true,
+                    prescription: true,
+                }
+            },
+            doctorSchedules: {
+                include: {
+                    schedule: true,
+                }
+            },
+            reviews: true
+        }
   })
 
   return doctor
@@ -36,7 +60,7 @@ const deleteDoctor= async(doctorId:string)=>{
   return doctor
 }
 
-const updateDoctor = async(doctorId:string,payload: Partial<Doctor>)=>{
+const updateDoctor = async(doctorId:string,payload:  Partial<Prisma.DoctorUpdateInput>)=>{
   const existingDoctor = await prisma.doctor.findFirst({
     where:{
       id:doctorId,
@@ -57,6 +81,69 @@ const updateDoctor = async(doctorId:string,payload: Partial<Doctor>)=>{
 
   return result
 }
+
+
+
+// const updateDoctor = async (doctorId: string, payload: IUpdateDoctorPayload) => {
+//     const isDoctorExist = await prisma.doctor.findUnique({
+//         where: {
+//             id:doctorId,
+//         }
+//     })
+
+//     if (!isDoctorExist) {
+//         throw new AppError(status.NOT_FOUND, "Doctor not found");
+//     }
+
+//     const { doctor: doctorData, specialties } = payload;
+
+//     await prisma.$transaction(async (tx) => {
+//         if (doctorData) {
+//             await tx.doctor.update({
+//                 where: {
+//                     id:doctorId,
+//                 },
+//                 data: {
+//                     ...doctorData,
+//                 }
+//             })
+//         }
+
+//         if (specialties && specialties.length > 0) {
+//             for (const specialty of specialties) {
+//                 const { specialtyId, shouldDelete } = specialty;
+//                 if (shouldDelete) {
+//                     await tx.doctorSpecialty.delete({
+//                         where: {
+//                             doctorId_specialtyId: {
+//                                 doctorId: doctorId,
+//                                 specialtyId,
+//                             }
+//                         }
+//                     })
+//                 } else {
+//                     await tx.doctorSpecialty.upsert({
+//                         where: {
+//                             doctorId_specialtyId: {
+//                                 doctorId: doctorId,
+//                                 specialtyId,
+//                             }
+//                         },
+//                         create: {
+//                             doctorId: doctorId,
+//                             specialtyId,
+//                         },
+//                         update: {}
+//                     })
+//                 }
+//             }
+//         }
+//     })
+
+//     const doctor = await getDoctorById(doctorId);
+
+//     return doctor;
+// }
 
 export const DoctorService={
    getAllDoctors,
