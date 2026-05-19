@@ -180,6 +180,32 @@ const deleteAuth = catchAsync(
 );
 
 
+const forgetPassword = catchAsync(
+    async (req: Request, res: Response) => {
+        const { email } = req.body;
+        await AuthService.forgotPassword(email);
+
+        sendResponse(res, {
+            httpStatusCode: status.OK,
+            success: true,
+            message: "Password reset OTP sent to email successfully",
+        });
+    }
+)
+
+const resetPassword = catchAsync(
+    async (req: Request, res: Response) => {
+        const { email, otp, newPassword } = req.body;
+        await AuthService.resetPassword(email, otp, newPassword);
+
+        sendResponse(res, {
+            httpStatusCode: status.OK,
+            success: true,
+            message: "Password reset successfully",
+        });
+    }
+)
+
 export const AuthController = {
     registerPatient,
     loginUser,
@@ -188,5 +214,7 @@ export const AuthController = {
     changePassword,
     logoutUser,
     verifyEmail,
-    deleteAuth
+    deleteAuth,
+    forgetPassword,
+    resetPassword
 }

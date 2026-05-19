@@ -16,4 +16,7 @@ router.post("/verify-email", AuthController.verifyEmail)
 
 router.delete("/:deleteId", AuthController.deleteAuth);
 
+router.post("/forget-password", AuthController.forgetPassword)
+router.post("/reset-password", AuthController.resetPassword)
+
 export const AuthRoutes = router
