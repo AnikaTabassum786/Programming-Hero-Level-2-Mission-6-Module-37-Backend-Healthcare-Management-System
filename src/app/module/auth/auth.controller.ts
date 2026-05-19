@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Request, Response } from "express";
 import { catchAsync } from "../../shared/catchAsync";
 import { AuthService } from "./auth.service";
@@ -152,6 +153,32 @@ const logoutUser = catchAsync(
     }
 )
 
+const verifyEmail = catchAsync(
+    async(req:Request,res:Response)=>{
+        const {email,otp} = req.body;
+ await AuthService.verifyEmail(email, otp);
+        sendResponse(res,{
+            httpStatusCode:status.OK,
+            success:true,
+            message:"Email verified successfully"
+        })
+    }
+)
+
+const deleteAuth = catchAsync(
+  async (req: Request, res: Response) => {
+    const { deleteId } = req.params;
+
+    const result = await AuthService.deleteAuth(deleteId as string);
+
+    sendResponse(res, {
+       httpStatusCode:status.OK,
+            success:true,
+            message:"User Deleted successfully"
+    });
+  }
+);
+
 
 export const AuthController = {
     registerPatient,
@@ -159,5 +186,7 @@ export const AuthController = {
     getMe,
     getNewToken,
     changePassword,
-    logoutUser
+    logoutUser,
+    verifyEmail,
+    deleteAuth
 }
