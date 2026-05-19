@@ -251,6 +251,19 @@ const changePassword = async (payload: IChangePasswordPayload, sessionToken: str
         })
     })
 
+    if (session.user.needPasswordChange) {
+        await prisma.user.update({
+            where: {
+                id: session.user.id,
+            },
+            data: {
+                needPasswordChange: false
+            }
+        })
+    }
+
+
+
     const accessToken = tokenUtils.getAccessToken({
         userId: session.user.id,
         role: session.user.role,
@@ -329,22 +342,22 @@ const forgotPassword = async (email: string) => {
         throw new AppError(status.NOT_FOUND, "User not found")
     }
 
-    if(!isUserExists.emailVerified){
+    if (!isUserExists.emailVerified) {
         throw new AppError(status.BAD_REQUEST, "Email not verified");
     }
 
-       if(isUserExists.isDeleted || isUserExists.status === UserStatus.DELETED){
-        throw new AppError(status.NOT_FOUND, "User not found"); 
+    if (isUserExists.isDeleted || isUserExists.status === UserStatus.DELETED) {
+        throw new AppError(status.NOT_FOUND, "User not found");
     }
 
     await auth.api.requestPasswordResetEmailOTP({
-        body:{
+        body: {
             email,
         }
     })
 }
 
-const resetPassword = async (email : string, otp : string, newPassword : string) => {
+const resetPassword = async (email: string, otp: string, newPassword: string) => {
     const isUserExists = await prisma.user.findUnique({
         where: {
             email,
@@ -364,10 +377,10 @@ const resetPassword = async (email : string, otp : string, newPassword : string)
     }
 
     await auth.api.resetPasswordEmailOTP({
-        body:{
+        body: {
             email,
             otp,
-            password : newPassword,
+            password: newPassword,
         }
     })
 
@@ -383,8 +396,8 @@ const resetPassword = async (email : string, otp : string, newPassword : string)
     }
 
     await prisma.session.deleteMany({
-        where:{
-            userId : isUserExists.id,
+        where: {
+            userId: isUserExists.id,
         }
     })
 }
