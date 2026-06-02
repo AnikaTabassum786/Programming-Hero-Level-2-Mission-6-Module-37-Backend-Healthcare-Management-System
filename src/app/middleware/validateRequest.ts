@@ -1,15 +1,20 @@
 import { NextFunction, Request, Response } from "express"
 import z from "zod"
 
-export const validationRequest = (ZodSchema: z.ZodObject)=>{
-    return(req:Request, res:Response, next:NextFunction)=>{
+export const validationRequest = (ZodSchema: z.ZodObject) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+
+        if (req.body.data) {
+            req.body = JSON.parse(req.body.data)
+        }
+        
         const parsedResult = ZodSchema.safeParse(req.body)
 
-        if(!parsedResult.success){
+        if (!parsedResult.success) {
             next(parsedResult.error)
         }
 
-         req.body = parsedResult.data
-         next()
+        req.body = parsedResult.data
+        next()
     }
 }

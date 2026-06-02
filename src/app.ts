@@ -23,17 +23,20 @@ app.use(cors({
   allowedHeaders:["content-Type","Authorization"]
 }))
 
-app.use("/api/auth",toNodeHandler(auth))
+
 
 
 // Enable URL-encoded form data parsing
 app.use(express.urlencoded({ extended: true }));
 
 // Middleware to parse JSON bodies
+app.use(cookieParser());
 app.use(express.json());
-app.use(cookieParser())
+app.use(express.urlencoded({extended:true}))
 
 app.use("/api/v1",IndexRoutes)
+
+app.use("/api/auth",toNodeHandler(auth))
 
 // Basic route
 app.get('/', async (req: Request, res: Response) => {
