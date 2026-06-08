@@ -101,65 +101,24 @@ export class QueryBuilder<
         return this;
     }
 
-    // filter(): this {
-
-    //     const { filterableFields } = this.config;
-    //     const excludedField = ['searchTerm', 'page', 'limit', 'sortBy', 'sortOrder', 'fields', 'include'] //these are not for filter
-    //     const filterParams: Record<string, unknown> = {};
-
-    //     //use loop to collect all valid filter
-    //     Object.keys(this.queryParams).forEach((key) => {
-    //         if (!excludedField.includes(key)) {
-    //             filterParams[key] = this.queryParams[key];
-    //         }
-    //     })
-
-
-    //     const queryWhere = this.query.where as Record<string, unknown>;  // filter condition is added here
-    //     const countQueryWhere = this.countQuery.where as Record<string, unknown>; // filter condition is added here
-
-    //     Object.keys(filterParams).forEach((key) => {
-    //         const value = filterParams[key]
-    //         if (value === undefined || value === "") {
-    //             return;
-    //         }
-    //     })
-
-    //     const isAllowedField = !filterableFields || filterableFields.length === 0 || filterableFields.includes(key); // if field is not in this list
-
-    //     if(key.includes(".")){
-    //         const parts = key.split(".")
-
-    //          if(filterableFields && !filterableFields.includes(key)){
-    //                 return;
-    //             }
-
-    //     }
-
-    //     if (!isAllowedField) {
-    //         return
-    //     }
-
-        
-
-    //     return this;
-    // }
+  
 
        filter() : this {
 
         const { filterableFields } = this.config;
-        const excludedField = ['searchTerm', 'page', 'limit', 'sortBy', 'sortOrder', 'fields', 'include'];
+        const excludedField = ['searchTerm', 'page', 'limit', 'sortBy', 'sortOrder', 'fields', 'include']; //these are not for filter
 
         const filterParams : Record<string, unknown> = {};
 
+        //use loop to collect all valid filter
         Object.keys(this.queryParams).forEach((key) => {
             if(!excludedField.includes(key)){
                 filterParams[key] = this.queryParams[key];
             }
         })
 
-        const queryWhere = this.query.where as Record<string, unknown>;
-        const countQueryWhere = this.countQuery.where as Record<string, unknown>;
+        const queryWhere = this.query.where as Record<string, unknown>; // filter condition is added here
+        const countQueryWhere = this.countQuery.where as Record<string, unknown>; // filter condition is added here
 
         Object.keys(filterParams).forEach((key) => {
             const value = filterParams[key];
@@ -168,7 +127,7 @@ export class QueryBuilder<
                 return;
             }
 
-            const isAllowedField = !filterableFields || filterableFields.length === 0 || filterableFields.includes(key);
+            const isAllowedField = !filterableFields || filterableFields.length === 0 || filterableFields.includes(key); // if field is not in this list
 
             
             // doctorFilterableFields = ['specialties.specialty.title', 'appointmentFee']
@@ -258,6 +217,87 @@ export class QueryBuilder<
             queryWhere[key] = this.parseFilterValue(value);
             countQueryWhere[key] = this.parseFilterValue(value);
         })
+        return this;
+    }
+
+    paginate():this{
+        const page = Number(this.queryParams.page) || 1;
+        const limit = Number(this.queryParams.page) || 10;
+
+        this.page = page;
+        this.limit = limit;
+        this.skip = (page-1)*limit;
+
+        this.query.skip = this.skip;
+        this.query.take = this.skip;
+
+        return this
+    }
+
+    sort () : this {
+        const sortBy = this.queryParams.sortBy || 'createdAt';
+        const sortOrder = this.queryParams.sortOrder === 'asc' ? 'asc':'desc';
+
+        this.sortBy = sortBy;
+        this.sortOrder = sortOrder;
+
+         if(sortBy.includes(".")){
+            const parts = sortBy.split(".");
+
+            if(parts.length === 2){
+                const [relation, nestedField] = parts;
+
+                this.query.orderBy = {
+                    [relation] : {
+                        [nestedField] : sortOrder
+                    }
+                }
+            }else if(parts.length === 3){
+                const [relation, nestedRelation, nestedField] = parts;
+
+                this.query.orderBy = {
+                    [relation] : {
+                        [nestedRelation] : {
+                            [nestedField] : sortOrder
+                        }
+                    }
+                }
+            }else{
+                this.query.orderBy = {
+                    [sortBy] : sortOrder
+                }
+            }
+        }else{
+            this.query.orderBy = {
+                [sortBy]: sortOrder
+            }
+        }
+
+        return this
+    }
+
+
+    //fields determine which fields the user wants.
+     fields() : this {
+        const fieldsParam = this.queryParams.fields;
+        // /doctors?fields=id,name,user => select: { id: true, name: true, user: { select: { name: true } } }
+
+        //no nested field selection for now, only direct fields
+        if(fieldsParam && typeof fieldsParam === 'string'){
+            const fieldsArray = fieldsParam?.split(",").map(field => field.trim());
+            this.selectFields = {};
+
+            fieldsArray?.forEach((field) => {
+                if (this.selectFields) {
+                    this.selectFields[field] = true;
+                }
+            })
+
+            this.query.select = this.selectFields as Record<string, boolean | Record<string, unknown>>;
+
+            //in Prisma select and include is not used together
+            delete this.query.include;
+        }
         return this;
     }
 
