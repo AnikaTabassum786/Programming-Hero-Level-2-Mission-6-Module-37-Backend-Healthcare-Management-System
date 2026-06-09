@@ -3,7 +3,7 @@ import { prisma } from "../../lib/prisma"
 
 import { Doctor, Prisma } from "../../../generated/prisma/client"
 import { QueryBuilder } from "../../utils/QueryBuilder"
-import { doctorFilterableFields, doctorSearchableFields } from "./doctor.constant"
+import { doctorFilterableFields, doctorIncludeConfig, doctorSearchableFields } from "./doctor.constant"
 import { IQueryParams } from "../../interfaces/query.interface"
 
 
@@ -21,14 +21,39 @@ const getAllDoctors = async(query : IQueryParams)=>{
     // return doctors
 
     
+    //The purpose of this QueryBuilder is to extract Doctor data by performing Search + Filter + Include + Pagination + Sorting + Field Selection in one line.
     const queryBuilder = new QueryBuilder<Doctor, Prisma.DoctorWhereInput, Prisma.DoctorInclude>(
         prisma.doctor,
         query,
         {
-            searchableFields: doctorSearchableFields,
-            filterableFields: doctorFilterableFields,
+            searchableFields: doctorSearchableFields, // user can search
+            filterableFields: doctorFilterableFields, // user can filter
         }
     )
+
+     const result = await queryBuilder
+        .search()
+        .filter()
+        .where({
+            isDeleted: false,
+        })
+        .include({
+            user: true,
+            // specialties: true,
+            specialties: {
+                include:{
+                    specialty: true
+                }
+            },
+        })
+        .dynamicInclude(doctorIncludeConfig)
+        .paginate()
+        .sort()
+        .fields()
+        .execute();
+
+        console.log(result);
+    return result;
 }
 
 const getDoctorById = async(doctorId:string)=>{
