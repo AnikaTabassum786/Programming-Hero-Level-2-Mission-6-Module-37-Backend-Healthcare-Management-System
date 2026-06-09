@@ -1,21 +1,34 @@
 
 import { prisma } from "../../lib/prisma"
 
-import { Prisma } from "../../../generated/prisma/client"
+import { Doctor, Prisma } from "../../../generated/prisma/client"
+import { QueryBuilder } from "../../utils/QueryBuilder"
+import { doctorFilterableFields, doctorSearchableFields } from "./doctor.constant"
+import { IQueryParams } from "../../interfaces/query.interface"
 
 
-const getAllDoctors = async()=>{
-    const doctors = await prisma.doctor.findMany({
-      include:{
-        user:true,
-        specialties:{
-            include:{
-                specialty:true
-            }
+const getAllDoctors = async(query : IQueryParams)=>{
+    // const doctors = await prisma.doctor.findMany({
+    //   include:{
+    //     user:true,
+    //     specialties:{
+    //         include:{
+    //             specialty:true
+    //         }
+    //     }
+    //   }
+    // })
+    // return doctors
+
+    
+    const queryBuilder = new QueryBuilder<Doctor, Prisma.DoctorWhereInput, Prisma.DoctorInclude>(
+        prisma.doctor,
+        query,
+        {
+            searchableFields: doctorSearchableFields,
+            filterableFields: doctorFilterableFields,
         }
-      }
-    })
-    return doctors
+    )
 }
 
 const getDoctorById = async(doctorId:string)=>{
