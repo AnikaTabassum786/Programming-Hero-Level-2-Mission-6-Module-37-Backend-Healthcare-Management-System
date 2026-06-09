@@ -228,8 +228,10 @@ export class QueryBuilder<
         this.limit = limit;
         this.skip = (page - 1) * limit;
 
-        this.query.skip = this.skip;
-        this.query.take = this.skip;
+        // this.query.skip = this.skip;
+        // this.query.take = this.skip;
+          this.query.skip = this.skip;
+        this.query.take = this.limit;
 
         return this
     }

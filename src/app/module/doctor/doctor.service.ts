@@ -56,6 +56,8 @@ const getAllDoctors = async(query : IQueryParams)=>{
     return result;
 }
 
+
+
 const getDoctorById = async(doctorId:string)=>{
   const doctor = await prisma.doctor.findUnique({
     where:{
