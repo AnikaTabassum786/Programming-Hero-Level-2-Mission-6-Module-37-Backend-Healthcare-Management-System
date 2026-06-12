@@ -81,6 +81,8 @@ const getMyDoctorSchedules = async (user: IRequestUser, query: IQueryParams) => 
 }
 
 const getAllDoctorSchedules = async (query: IQueryParams) => {
+
+    //Here a QueryBuilder object is being created.
     const queryBuilder = new QueryBuilder<DoctorSchedules, Prisma.DoctorSchedulesWhereInput, Prisma.DoctorSchedulesInclude>(prisma.doctorSchedules, query, {
         filterableFields: doctorScheduleFilterableFields,
         searchableFields: doctorScheduleSearchableFields
@@ -100,6 +102,9 @@ const getAllDoctorSchedules = async (query: IQueryParams) => {
 const getDoctorScheduleById = async (doctorId: string, scheduleId: string) => {
     const doctorSchedule = await prisma.doctorSchedules.findUnique({
         where: {
+
+            //This function finds a specific doctor schedule.
+
             doctorId_scheduleId: {
                 doctorId: doctorId,
                 scheduleId: scheduleId
@@ -161,6 +166,8 @@ const updateMyDoctorSchedule = async (user: IRequestUser, payload: IUpdateDoctor
 }
 
 const deleteMyDoctorSchedule = async (id: string, user: IRequestUser) => {
+
+    //A Doctor can delete his/her own schedule, but only if that schedule is not yet booked.
     const doctorData = await prisma.doctor.findUniqueOrThrow({
         where: {
             email: user.email
