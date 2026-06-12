@@ -7,74 +7,76 @@ import { doctorScheduleFilterableFields, doctorScheduleIncludeConfig, doctorSche
 import { ICreateDoctorSchedulePayload, IUpdateDoctorSchedulePayload } from "./doctorSchedule.interface";
 
 
-const createMyDoctorSchedule = async (user : IRequestUser, payload : ICreateDoctorSchedulePayload) => {
-    
+const createMyDoctorSchedule = async (user: IRequestUser, payload: ICreateDoctorSchedulePayload) => {
+
     // Searching the Doctor table using the email obtained from the JWT token.
     const doctorData = await prisma.doctor.findUniqueOrThrow({
-        where:{
-            email : user.email
+        where: {
+            email: user.email
         }
     });
 
     //Request for schedule
     const doctorScheduleData = payload.scheduleIds.map((scheduleId) => ({
-        doctorId : doctorData.id,
+        doctorId: doctorData.id,
         scheduleId
-    }) )
+    }))
 
     // createMany() is used to insert multiple rows at once.
     await prisma.doctorSchedules.createMany({
-        data : doctorScheduleData
+        data: doctorScheduleData
     });
 
     //fetch newly created data
     const result = await prisma.doctorSchedules.findMany({
-        where : {
-            doctorId : doctorData.id,
-            scheduleId : {
-                in : payload.scheduleIds
+        where: {
+            doctorId: doctorData.id,
+            scheduleId: {
+                in: payload.scheduleIds
             }
         },
-        include : {
+        include: {
             schedule: true
         }
     })
-    
+
 
     return result;
 }
 
-const getMyDoctorSchedules = async (user : IRequestUser, query : IQueryParams) => {
+//This is the main data fetch logic.
+const getMyDoctorSchedules = async (user: IRequestUser, query: IQueryParams) => {
     const doctorData = await prisma.doctor.findUniqueOrThrow({
-        where:{
-            email : user.email
+        where: {
+            email: user.email
         }
     });
     const queryBuilder = new QueryBuilder<DoctorSchedules, Prisma.DoctorSchedulesWhereInput, Prisma.DoctorSchedulesInclude>(prisma.doctorSchedules,
-    {
-    doctorId: doctorData.id,
-    ...query
-    }, 
-    {
-        filterableFields: doctorScheduleFilterableFields,
-        searchableFields: doctorScheduleSearchableFields
-    })
+        {
+            doctorId: doctorData.id,
+            ...query
+        },
+        {
+            //Determines which fields can be filtered/searched by
+            filterableFields: doctorScheduleFilterableFields,
+            searchableFields: doctorScheduleSearchableFields
+        })
     const doctorSchedules = await queryBuilder
-    .search()
-    .filter()
-    .paginate()
-    .include({
-        schedule: true,
-        doctor : {
-            include:{
-                user: true,
+        .search() //Find data with search keyword
+        .filter() //Specific conditions (like gender, specialization etc.)
+        .paginate() //Divides data according to page & limit
+        .include({
+            schedule: true,
+            doctor: {
+                include: {
+                    user: true,
+                }
             }
-        }
-    })
-    .sort()
-    .fields()
-    .dynamicInclude(doctorScheduleIncludeConfig)
-    .execute();
+        })
+        .sort() //order by date, name etc.
+        .fields()
+        .dynamicInclude(doctorScheduleIncludeConfig) //Include relational data (doctor, appointment, doctor schedule etc.)
+        .execute();
     return doctorSchedules;
 }
 
@@ -85,12 +87,12 @@ const getAllDoctorSchedules = async (query: IQueryParams) => {
     })
 
     const result = await queryBuilder
-    .search()
-    .filter()
-    .paginate()
-    .dynamicInclude(doctorScheduleIncludeConfig)
-    .sort()
-    .execute();
+        .search()
+        .filter()
+        .paginate()
+        .dynamicInclude(doctorScheduleIncludeConfig)
+        .sort()
+        .execute();
 
     return result;
 }
@@ -112,50 +114,50 @@ const getDoctorScheduleById = async (doctorId: string, scheduleId: string) => {
 }
 
 
-const updateMyDoctorSchedule = async (user : IRequestUser, payload: IUpdateDoctorSchedulePayload) => {
+const updateMyDoctorSchedule = async (user: IRequestUser, payload: IUpdateDoctorSchedulePayload) => {
 
-        //the doctor record is being retrieved using the email address of the logged-in doctor.
-        const doctorData = await prisma.doctor.findUniqueOrThrow({
-            where:{
-                email : user.email
+    //the doctor record is being retrieved using the email address of the logged-in doctor.
+    const doctorData = await prisma.doctor.findUniqueOrThrow({
+        where: {
+            email: user.email
+        }
+    });
+
+    // Separate Schedule for Delete
+    const deleteIds = payload.scheduleIds.filter(schedule => schedule.shouldDelete).map(schedule => schedule.id);
+
+    //    Separate Schedule for Create
+    const createIds = payload.scheduleIds.filter(schedule => !schedule.shouldDelete).map(schedule => schedule.id);
+
+
+    const result = await prisma.$transaction(async (tx) => {
+
+        //Delete old schedule. No one has booked an appointment yet.
+        await tx.doctorSchedules.deleteMany({
+            where: {
+                isBooked: false,
+                doctorId: doctorData.id,
+                scheduleId: {
+                    in: deleteIds
+                }
             }
         });
 
-        // Separate Schedule for Delete
-        const deleteIds = payload.scheduleIds.filter(schedule => schedule.shouldDelete).map(schedule => schedule.id);
+        //New data will created
+        const doctorScheduleData = createIds.map((scheduleId) => ({
+            doctorId: doctorData.id,
+            scheduleId
+        }))
 
-    //    Separate Schedule for Create
-        const createIds = payload.scheduleIds.filter(schedule => !schedule.shouldDelete).map(schedule => schedule.id);
-
-
-        const result = await prisma.$transaction(async (tx) => {
-
-            //Delete old schedule. No one has booked an appointment yet.
-            await tx.doctorSchedules.deleteMany({
-                where : {
-                    isBooked: false,
-                    doctorId : doctorData.id,
-                    scheduleId : {
-                        in : deleteIds
-                    }
-                }
-            });
-
-            //New data will created
-            const doctorScheduleData = createIds.map((scheduleId) => ({
-                doctorId : doctorData.id,
-                scheduleId
-            }) )
-
-            //Multiple doctor schedules are created at once.
-            const result = await tx.doctorSchedules.createMany({
-                data : doctorScheduleData
-            });
-
-            return result;
-        })
+        //Multiple doctor schedules are created at once.
+        const result = await tx.doctorSchedules.createMany({
+            data: doctorScheduleData
+        });
 
         return result;
+    })
+
+    return result;
 }
 
 const deleteMyDoctorSchedule = async (id: string, user: IRequestUser) => {
