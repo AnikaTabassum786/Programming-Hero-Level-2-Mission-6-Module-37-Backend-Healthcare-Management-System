@@ -113,18 +113,24 @@ const getDoctorScheduleById = async (doctorId: string, scheduleId: string) => {
 
 
 const updateMyDoctorSchedule = async (user : IRequestUser, payload: IUpdateDoctorSchedulePayload) => {
+
+        //the doctor record is being retrieved using the email address of the logged-in doctor.
         const doctorData = await prisma.doctor.findUniqueOrThrow({
             where:{
                 email : user.email
             }
         });
 
+        // Separate Schedule for Delete
         const deleteIds = payload.scheduleIds.filter(schedule => schedule.shouldDelete).map(schedule => schedule.id);
 
+    //    Separate Schedule for Create
         const createIds = payload.scheduleIds.filter(schedule => !schedule.shouldDelete).map(schedule => schedule.id);
+
 
         const result = await prisma.$transaction(async (tx) => {
 
+            //Delete old schedule. No one has booked an appointment yet.
             await tx.doctorSchedules.deleteMany({
                 where : {
                     isBooked: false,
@@ -135,11 +141,13 @@ const updateMyDoctorSchedule = async (user : IRequestUser, payload: IUpdateDocto
                 }
             });
 
+            //New data will created
             const doctorScheduleData = createIds.map((scheduleId) => ({
                 doctorId : doctorData.id,
                 scheduleId
             }) )
 
+            //Multiple doctor schedules are created at once.
             const result = await tx.doctorSchedules.createMany({
                 data : doctorScheduleData
             });
