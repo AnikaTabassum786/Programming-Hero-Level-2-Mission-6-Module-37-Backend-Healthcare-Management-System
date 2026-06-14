@@ -68,6 +68,7 @@ const getAllAppointments = catchAsync(async (req: Request, res: Response) => {
 const bookAppointmentWithPayLater = catchAsync(async (req: Request, res: Response) => {
     const payload = req.body;
     const user = req.user;
+    //An appointment will be created here. But payment will not be made.
     const appointment = await AppointmentService.bookAppointmentWithPayLater(payload, user);
     sendResponse(res, {
         success: true,  

@@ -8,6 +8,8 @@ import { AppointmentStatus, PaymentStatus, Role } from "../../../generated/prism
 import AppError from "../../errorHelpers/AppError";
 import status from "http-status";
 
+import { stripe } from "../../../config/stripe.config";
+
 
 // Pay Now Book Appointment
 const bookAppointment = async (payload: IBookAppointmentPayload, user: IRequestUser) => {
@@ -72,8 +74,9 @@ const bookAppointment = async (payload: IBookAppointmentPayload, user: IRequestU
 
         //TODO : Payment Integration will be here
 
-        const transactionId = String(uuidv7());
+        const transactionId = String(uuidv7()); //Unique transaction ID for payment.
 
+        //A record is created in the Payment table.
         const paymentData = await tx.payment.create({
             data: {
                 appointmentId: appointmentData.id,
@@ -82,6 +85,7 @@ const bookAppointment = async (payload: IBookAppointmentPayload, user: IRequestU
             }
         });
 
+        //Here Stripe is creating a payment page.
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             mode: 'payment',
@@ -92,30 +96,34 @@ const bookAppointment = async (payload: IBookAppointmentPayload, user: IRequestU
                         product_data: {
                             name: `Appointment with Dr. ${doctorData.name}`,
                         },
-                        unit_amount: doctorData.appointmentFee * 100,
+                        unit_amount: doctorData.appointmentFee * 100, //Stripe takes the amount in paisa/cents.
                     },
                     quantity: 1,
                 }
             ],
+
+
+            //Sending extra data with Stripe. This data will be used later in the webhook.
             metadata: {
                 appointmentId: appointmentData.id,
                 paymentId: paymentData.id,
             },
 
-            success_url: `${envVars.FRONTEND_URL}/dashboard/payment/payment-success`,
+            success_url: `${envVars.FRONTEND_URL}/dashboard/payment/payment-success`, //If the payment is successful, the user will be redirected here.
 
-            // cancel_url: `${envVars.FRONTEND_URL}/dashboard/payment/payment-failed`,
+            // cancel_url: `${envVars.FRONTEND_URL}/dashboard/payment/payment-failed`, //If the user cancels the payment, it will go here.
             cancel_url: `${envVars.FRONTEND_URL}/dashboard/appointments`,
         })
 
         return {
             appointmentData,
             paymentData,
-            paymentUrl: session.url,
+            paymentUrl: session.url, //Stripe provides a payment link.
         };
     });
 
     return {
+        //This data will be sent to the frontend.
         appointment: result.appointmentData,
         payment: result.paymentData,
         paymentUrl: result.paymentUrl,
@@ -263,12 +271,16 @@ const getAllAppointments = async () => {
 }
 
 const bookAppointmentWithPayLater = async (payload: IBookAppointmentPayload, user: IRequestUser) => {
+
+    //Extracting patient from JWT Token.
     const patientData = await prisma.patient.findUniqueOrThrow({
         where: {
             email: user.email,
         }
     });
 
+
+    //The doctor I want to make an appointment with:Is he in the database?Is he not deleted?
     const doctorData = await prisma.doctor.findUniqueOrThrow({
         where: {
             id: payload.doctorId,
@@ -276,12 +288,15 @@ const bookAppointmentWithPayLater = async (payload: IBookAppointmentPayload, use
         }
     });
 
+    //Checking whether the time slot (schedule) chosen by the user is available.
     const scheduleData = await prisma.schedule.findUniqueOrThrow({
         where: {
             id: payload.scheduleId,
         }
     });
 
+
+    //Is this doctor available on this schedule?Checking if the relationship is OK
     const doctorSchedule = await prisma.doctorSchedules.findUniqueOrThrow({
         where: {
             doctorId_scheduleId: {
@@ -291,7 +306,15 @@ const bookAppointmentWithPayLater = async (payload: IBookAppointmentPayload, use
         }
     });
 
+    //A unique ID is created for each appointment.Video consultation room,meeting link reference
     const videoCallingId = String(uuidv7());
+
+
+    // 3 tasks will be done together:
+
+    //appointment create
+    //schedule booked update
+    //payment record create
 
     const result = await prisma.$transaction(async (tx) => {
         const appointmentData = await tx.appointment.create({
@@ -311,11 +334,16 @@ const bookAppointmentWithPayLater = async (payload: IBookAppointmentPayload, use
                 }
             },
             data: {
-                isBooked: true,
+                isBooked: true, //No one else can book this time slot.
             }
         });
 
         const transactionId = String(uuidv7());
+
+        //Here only payment record is being created
+        //Money is not  taken
+        //Stripe call is not  made
+        // “pending payment record” is  kept
 
         const paymentData = await tx.payment.create({
             data: {
