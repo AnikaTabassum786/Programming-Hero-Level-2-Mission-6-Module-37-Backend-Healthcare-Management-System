@@ -370,6 +370,7 @@ const initiatePayment = async (appointmentId: string, user: IRequestUser) => {
         }
     });
 
+    //Is this appointment ID available? Is this appointment for this patient?
     const appointmentData = await prisma.appointment.findUniqueOrThrow({
         where: {
             id: appointmentId,
@@ -381,24 +382,29 @@ const initiatePayment = async (appointmentId: string, user: IRequestUser) => {
         }
     });
 
+    //Check if there is a payment record.
     if (!appointmentData) {
         throw new AppError(status.NOT_FOUND, "Appointment not found");
     }
 
+    //If payment has already been made.Payment cannot be made again
     if (!appointmentData.payment) {
         throw new AppError(status.NOT_FOUND, "Payment data not found for this appointment");
     }
 
+    //If appointment is cancelled.Payment not allowed
     if (appointmentData.payment?.status === PaymentStatus.PAID) {
         throw new AppError(status.BAD_REQUEST, "Payment already completed for this appointment");
     };
 
+    //Check if appointment is canceled. If appointment is cancelled, payment not allowed
     if (appointmentData.status === AppointmentStatus.CANCELED) {
         throw new AppError(status.BAD_REQUEST, "Appointment is canceled");
     }
 
+    //This is where the Stripe payment page is created.
     const session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
+        payment_method_types: ["card"], //Only card payment allowed
         mode: 'payment',
         line_items: [
             {
@@ -412,19 +418,23 @@ const initiatePayment = async (appointmentId: string, user: IRequestUser) => {
                 quantity: 1,
             }
         ],
+
+        //Later on the webhook will be used to:Payment for an appointment,A payment row needs to be updated
         metadata: {
             appointmentId: appointmentData.id,
             paymentId: appointmentData.payment.id,
         },
 
+        //If payment is successful, user will go this page
         success_url: `${envVars.FRONTEND_URL}/dashboard/payment/payment-success?appointment_id=${appointmentData.id}&payment_id=${appointmentData.payment.id}`,
 
         // cancel_url: `${envVars.FRONTEND_URL}/dashboard/payment/payment-failed`,
+        //If the user cancels, they will be redirected to the appointment page.
         cancel_url: `${envVars.FRONTEND_URL}/dashboard/appointments?error=payment_cancelled`,
     })
 
     return {
-        paymentUrl: session.url,
+        paymentUrl: session.url, //When the user clicks on this link, the Stripe payment page will open.
     }
 }
 
