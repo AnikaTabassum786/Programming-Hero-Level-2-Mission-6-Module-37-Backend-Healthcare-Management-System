@@ -438,9 +438,13 @@ const initiatePayment = async (appointmentId: string, user: IRequestUser) => {
     }
 }
 
-const cancelUnpaidAppointments = async () => {
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
 
+//This is usually run every few minutes using a Cron Job, so that unpaid appointments are automatically canceled.
+
+const cancelUnpaidAppointments = async () => {
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000); //Finding the time 30 minutes ago
+
+    //Find appointments that were made 30 minutes ago and have not yet been paid for.
     const unpaidAppointments = await prisma.appointment.findMany({
         where: {
             // status: AppointmentStatus.SCHEDULED,
@@ -451,10 +455,12 @@ const cancelUnpaidAppointments = async () => {
         },
     });
 
-    const appointmentToCancel = unpaidAppointments.map(appointment => appointment.id);
+    const appointmentToCancel = unpaidAppointments.map(appointment => appointment.id); //Separating Appointment IDs
 
     await prisma.$transaction(async (tx) => {
 
+
+        //Canceling appointments.Those appointments unpaid
         await tx.appointment.updateMany({
             where: {
                 id: {
@@ -466,6 +472,7 @@ const cancelUnpaidAppointments = async () => {
             },
         });
 
+        //Delete Payment Record
         await tx.payment.deleteMany({
             where: {
                 appointmentId: {
@@ -473,7 +480,7 @@ const cancelUnpaidAppointments = async () => {
                 },
             },
         });
-
+//Doctor Schedule made available again
         for (const unpaidAppointment of unpaidAppointments) {
             await tx.doctorSchedules.update({
                 where: {
