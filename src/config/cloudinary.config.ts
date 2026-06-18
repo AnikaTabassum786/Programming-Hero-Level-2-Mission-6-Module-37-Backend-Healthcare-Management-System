@@ -58,6 +58,9 @@ export const uploadFileToCloudinary = async (
 
 }
 
+
+//he full URL is not required when deleting from Cloudinary; only the `public_id` is needed.
+
 export const deleteFileFromCloudinary = async (url : string) => {
 
     try {
@@ -68,6 +71,8 @@ export const deleteFileFromCloudinary = async (url : string) => {
         if (match && match[1]) {
             const publicId = match[1];
 
+
+            //Delete from Cloudinary
             await cloudinary.uploader.destroy(
                 publicId, {
                 resource_type: "image"

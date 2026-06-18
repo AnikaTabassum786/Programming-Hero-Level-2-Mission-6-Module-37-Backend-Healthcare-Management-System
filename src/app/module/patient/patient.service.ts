@@ -1,4 +1,5 @@
 // import { deleteFileFromCloudinary } from "../../config/cloudinary.config";
+import { deleteFileFromCloudinary } from "../../../config/cloudinary.config";
 import { IRequestUser } from "../../interfaces/requestUser.interface";
 import { prisma } from "../../lib/prisma";
 import { IUpdatePatientHealthDataPayload, IUpdatePatientProfilePayload } from "./patient.interface";
@@ -83,15 +84,20 @@ const updateMyProfile = async (user: IRequestUser, payload: IUpdatePatientProfil
 
         if(payload.medicalReports && Array.isArray(payload.medicalReports) && payload.medicalReports.length > 0){
             for (const report of payload.medicalReports){
+
+                //if `shouldDelete` is `true` and `reportId` exists. If both conditions , the deletion process will begin.
+
                 if(report.shouldDelete && report.reportId){
-                    const deletedReport = await tx.medicalReport.delete({
+                    const deletedReport = await tx.medicalReport.delete({ //After deletion, Prisma returns the data of the deleted row, which is stored in the `deletedReport` variable.
                         where : {
                             id : report.reportId,
                         }
                     });
 
+                    //PDF/image files remain on Cloudinary even after the database row is deleted.
+                    
                     if(deletedReport.reportLink){
-                        // await deleteFileFromCloudinary(deletedReport.reportLink);
+                    await deleteFileFromCloudinary(deletedReport.reportLink);
                     }
                 }else if(report.reportName && report.reportLink){
                     await tx.medicalReport.create({
