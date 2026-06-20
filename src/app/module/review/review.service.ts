@@ -9,35 +9,39 @@ import { ICreateReviewPayload } from "./review.interface";
 const giveReview = async (user : IRequestUser, payload : ICreateReviewPayload) => {
    const patientData = await prisma.patient.findUniqueOrThrow({
     where: {
-        email : user.email
+        email : user.email //Retrieving the patient from the Patient table using the logged-in user's email.
     }
    });
 
    const appointmentData = await prisma.appointment.findUniqueOrThrow({
     where: {
-        id : payload.appointmentId
+        id : payload.appointmentId //Retrieving the appointment for which the review is to be submitted from the database.
     }   });
 
+    //Cannot leave a review without making the payment.
     if(appointmentData.paymentStatus !== PaymentStatus.PAID){
         throw new AppError(status.BAD_REQUEST, "You can only review after payment is done");
     };
 
+    //Can not give review of another patient
     if(appointmentData.patientId !== patientData.id){
         throw new AppError(status.BAD_REQUEST, "You can only review for your own appointments");
     };
 
+    //Checking if there is a prior review for the appointment.
     const isReviewed = await prisma.review.findFirst({
         where: {
             appointmentId : payload.appointmentId
         }
     });
 
+    //If a review already exists for this, it will not allow a new review to be created.
     if (isReviewed) {
         throw new AppError(status.BAD_REQUEST, "You have already reviewed for this appointment. You can update your review instead.");
     };   
 
     const result = await prisma.$transaction(async (tx) => {
-        const review = await tx.review.create({
+        const review = await tx.review.create({   //create review
             data: {
                 ...payload,
                 patientId:appointmentData.patientId,
@@ -45,15 +49,17 @@ const giveReview = async (user : IRequestUser, payload : ICreateReviewPayload) =
             }
         });
 
+        //Calculating the doctor's average rating
         const averageRating = await tx.review.aggregate({
             where: {
-                doctorId: appointmentData.doctorId
+                doctorId: appointmentData.doctorId 
             },
             _avg: {
                 rating: true
             }
         });
 
+        //The average rating will be updated in the Doctor table.
         await tx.doctor.update({
             where: {
                 id: appointmentData.doctorId
