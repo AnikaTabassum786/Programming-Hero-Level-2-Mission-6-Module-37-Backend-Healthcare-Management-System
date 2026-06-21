@@ -129,7 +129,9 @@ import { Role } from "../../../generated/prisma/enums";
 // };
 
 const myPrescriptions = async (user: IRequestUser) => {
-    const isUserExists = await prisma.user.findUnique({
+
+    //The user is searched for in the database using their email.
+    const isUserExists = await prisma.user.findUnique({ 
         where: {
             email: user?.email
         }
@@ -139,14 +141,15 @@ const myPrescriptions = async (user: IRequestUser) => {
         throw new AppError(status.NOT_FOUND, "User not found");
     }
 
+    //If the logged-in user is a doctor
     if (isUserExists.role === Role.DOCTOR) {
         const prescriptions = await prisma.prescription.findMany({
             where: {
                 doctor: {
-                    email: user?.email
+                    email: user?.email  //Retrieve the prescriptions written by the doctor who has logged in.
                 }
             },
-            include: {
+            include: {   //Retrieve also patient,doctor and appointment information   
                 patient: true,
                 doctor: true,
                 appointment: true,
@@ -155,14 +158,15 @@ const myPrescriptions = async (user: IRequestUser) => {
         return prescriptions;
     }
 
+    //If the logged-in user is a patient
     if (isUserExists.role === Role.PATIENT) {
         const prescriptions = await prisma.prescription.findMany({
             where: {
                 patient: {
-                    email: user?.email
+                    email: user?.email  //Retrieve all prescriptions for the patient who has logged in.
                 }
             },
-            include: {
+            include: {  // //Retrieve also patient,doctor and appointment information  
                 patient: true,
                 doctor: true,
                 appointment: true,
