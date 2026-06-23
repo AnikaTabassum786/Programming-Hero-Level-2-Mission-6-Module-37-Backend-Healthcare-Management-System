@@ -8,132 +8,140 @@ import { ICreatePrescriptionPayload } from "./prescription.interface";
 import { Role } from "../../../generated/prisma/enums";
 import { generatePrescriptionPDF } from "./prescription.utils";
 import { uploadFileToCloudinary } from "../../../config/cloudinary.config";
+import { sendEmail } from "../../utils/email";
 
+//The function of this API is to enable a doctor to create a prescription for an appointment, generate a PDF, upload it to Cloudinary, and send an email to the patient.
 
-const givePrescription = async (user : IRequestUser, payload : ICreatePrescriptionPayload) => {
-    const doctorData = await prisma.doctor.findUniqueOrThrow({
+const givePrescription = async (user: IRequestUser, payload: ICreatePrescriptionPayload) => {
+    const doctorData = await prisma.doctor.findUniqueOrThrow({ //Information about the logged-in doctor is retrieved from the database.
         where: {
             email: user?.email
         },
     });
 
-    const appointmentData = await prisma.appointment.findUniqueOrThrow({
+    const appointmentData = await prisma.appointment.findUniqueOrThrow({ //All appointment details are retrieved.It takes other info like patient,specialties and doctorSchedules
         where: {
             id: payload.appointmentId
         },
         include: {
             patient: true,
             doctor: {
-                include:{
+                include: {
                     specialties: true
                 }
             },
             schedule: {
-                include:{
+                include: {
                     doctorSchedules: true
                 }
             },
         }
     });
 
-    if(appointmentData.doctorId !== doctorData.id){
+    //Check the doctor's appointment status.A doctor cannot write a prescription for another doctor's patient.
+    if (appointmentData.doctorId !== doctorData.id) {
         throw new AppError(status.BAD_REQUEST, "You can only give prescription for your own appointments");
     }
 
+
+    //Whether a prescription has been issued previously.
     const isAlreadyPrescribed = await prisma.prescription.findFirst({
         where: {
-            appointmentId : payload.appointmentId
+            appointmentId: payload.appointmentId
         }
     });
 
+
+    //Checking. If there is a prior prescription for the same appointment
     if (isAlreadyPrescribed) {
         throw new AppError(status.BAD_REQUEST, "You have already given prescription for this appointment. You can update the prescription instead.");
     }
 
-    const followUpDate = new Date(payload.followUpDate);
+    const followUpDate = new Date(payload.followUpDate); //Convert String to Date object 
 
-   
 
-   const result = await prisma.$transaction(async (tx) => {
-       const result = await tx.prescription.create({
-           data: {
-               ...payload,
-               followUpDate,
-               doctorId: appointmentData.doctorId,
-               patientId: appointmentData.patientId,
-           }
-       });
 
-       const pdfBuffer = await generatePrescriptionPDF({
-           doctorName: doctorData.name,
-           patientName: appointmentData.patient.name,
-           appointmentDate: appointmentData.schedule.startDateTime,
-           instructions: payload.instructions,
-           followUpDate,
-           doctorEmail: doctorData.email,
-           patientEmail: appointmentData.patient.email,
-           prescriptionId: result.id,
-           createdAt: new Date(),
-       });
+    const result = await prisma.$transaction(async (tx) => {
+        const result = await tx.prescription.create({ //Prescription Create
+            data: {
+                ...payload,
+                followUpDate,
+                doctorId: appointmentData.doctorId,
+                patientId: appointmentData.patientId,
+            }
+        });
 
-       const fileName = `Prescription-${Date.now()}.pdf`;
-       const uploadedFile = await uploadFileToCloudinary(pdfBuffer, fileName);
-       const pdfUrl = uploadedFile.secure_url;
+        const pdfBuffer = await generatePrescriptionPDF({ //The prescription PDF is generated here with these info
+            doctorName: doctorData.name,
+            patientName: appointmentData.patient.name,
+            appointmentDate: appointmentData.schedule.startDateTime,
+            instructions: payload.instructions,
+            followUpDate,
+            doctorEmail: doctorData.email,
+            patientEmail: appointmentData.patient.email,
+            prescriptionId: result.id,
+            createdAt: new Date(),
+        });
 
-       const updatedPrescription = await tx.prescription.update({
-           where: {
-               id: result.id
-           },
-           data: {
-               pdfUrl
-           }
-       });
+        //A buffer consists of binary data.Simply, The PDF file does not yet exist as a file.It exists in memory as data.
+        const fileName = `Prescription-${Date.now()}.pdf`;
+        const uploadedFile = await uploadFileToCloudinary(pdfBuffer, fileName); //The PDF file is uploaded to Cloudinary.
+        const pdfUrl = uploadedFile.secure_url; // Cloudinary return a url
 
-       try {
-        const patient = appointmentData.patient;
-        const doctor = appointmentData.doctor;
+        const updatedPrescription = await tx.prescription.update({ //The prescription record is updated.
+            where: {
+                id: result.id
+            },
+            data: {
+                pdfUrl
+            }
+        });
 
-           await sendEmail({
-               to: patient.email,
-               subject: `You have received a new prescription from Dr. ${doctor.name}`,
-               templateName: "prescription",
-               templateData: {
+        try {
+            const patient = appointmentData.patient;
+            const doctor = appointmentData.doctor;
+
+            await sendEmail({  //A notification will be sent to the patient's email.
+                to: patient.email,
+                subject: `You have received a new prescription from Dr. ${doctor.name}`,
+                templateName: "prescription",
+                templateData: { //These info in in email template
                     doctorName: doctor.name,
                     patientName: patient.name,
-                    specialization: doctor.specialties.map((s : any )=> s.title).join(", "),
+                    specialization: doctor.specialties.map((s: any) => s.title).join(", "),
                     appointmentDate: new Date(appointmentData.schedule.startDateTime).toLocaleString(),
                     issuedDate: new Date().toLocaleDateString(),
                     prescriptionId: result.id,
                     instructions: payload.instructions,
                     followUpDate: followUpDate.toLocaleDateString(),
                     pdfUrl: pdfUrl
-               },
-               attachments:[
-                {
-                    filename: fileName,
-                    content: pdfBuffer,
-                    contentType: 'application/pdf'
-                }
-               ]
-           })
-       } catch (error) {
-            console.log("Failed To send email notification for prescription", error);
-       }
+                },
+                attachments: [ //The PDF will be attached to the email.The patient will be able to download the PDF upon opening the email.
+                    {
+                        filename: fileName,
+                        content: pdfBuffer,
+                        contentType: 'application/pdf'
+                    }
+                ]
+            })
+        } catch (error) {
+            console.log("Failed To send email notification for prescription", error); 
+        }
 
-       return updatedPrescription;
-   }, {
-    maxWait : 15000,
-    timeout: 20000,
-   });
+        return updatedPrescription; //The prescription will remain saved even if the email is not sent.
+    }, {
+        maxWait: 15000,
+        timeout: 20000,
+    });
 
     return result;
-  
+
 };
 
 const myPrescriptions = async (user: IRequestUser) => {
 
     //The user is searched for in the database using their email.
-    const isUserExists = await prisma.user.findUnique({ 
+    const isUserExists = await prisma.user.findUnique({
         where: {
             email: user?.email
         }
@@ -275,7 +283,7 @@ const getAllPrescriptions = async () => {
 //                     schedule: true
 //                 }
 //             },
-            
+
 //         }
 //     });
 

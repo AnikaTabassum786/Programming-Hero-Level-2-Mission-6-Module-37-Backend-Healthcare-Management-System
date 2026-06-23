@@ -2,6 +2,8 @@ import express from 'express';
 import { checkAuth } from '../../middleware/checkAuth';
 import { Role } from '../../../generated/prisma/enums';
 import { PrescriptionController } from './prescription.controller';
+import { PrescriptionValidation } from './prescription.validation';
+import { validateRequest } from '../../middleware/validateRequest';
 
 
 
@@ -19,12 +21,12 @@ router.get(
     PrescriptionController.myPrescriptions
 )
 
-// router.post(
-//     '/',
-//     checkAuth(Role.DOCTOR),
-//     validateRequest(PrescriptionValidation.createPrescriptionZodSchema),
-//     PrescriptionController.givePrescription
-// )
+router.post(
+    '/',
+    checkAuth(Role.DOCTOR),
+    validateRequest(PrescriptionValidation.createPrescriptionZodSchema),
+    PrescriptionController.givePrescription
+)
 
 // router.patch(
 //     '/:id',
