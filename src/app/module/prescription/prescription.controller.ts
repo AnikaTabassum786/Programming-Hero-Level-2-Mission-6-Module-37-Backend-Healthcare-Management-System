@@ -5,17 +5,17 @@ import { sendResponse } from '../../shared/sendResponse';
 import httpStatus from 'http-status';
 
 
-// const givePrescription = catchAsync(async (req: Request, res: Response) => {
-//     const payload = req.body;
-//     const user = req.user;
-//     const result = await PrescriptionService.givePrescription(user, payload);
-//     sendResponse(res, {
-//         httpStatusCode: httpStatus.OK,
-//         success: true,
-//         message: 'Prescription created successfully',
-//         data: result,
-//     });
-// });
+const givePrescription = catchAsync(async (req: Request, res: Response) => {
+    const payload = req.body;
+    const user = req.user;
+    const result = await PrescriptionService.givePrescription(user, payload);
+    sendResponse(res, {
+        httpStatusCode: httpStatus.OK,
+        success: true,
+        message: 'Prescription created successfully',
+        data: result,
+    });
+});
 
 const myPrescriptions = catchAsync(async (req: Request, res: Response) => {
     const user = req.user;
@@ -72,7 +72,7 @@ const getAllPrescriptions = catchAsync(async (req: Request, res: Response) => {
 // });
 
 export const PrescriptionController = {
-    // givePrescription,
+    givePrescription,
     myPrescriptions,
     getAllPrescriptions,
     // updatePrescription,
