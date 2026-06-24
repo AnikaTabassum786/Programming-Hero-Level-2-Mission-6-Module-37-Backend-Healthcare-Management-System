@@ -10,30 +10,25 @@ interface InvoiceData {
     transactionId: string;
     paymentDate: string;
 }
-//It will take invoice data.
-//The PDF file will be returned as a buffer in memory.
 
 export const generateInvoicePdf = async (data: InvoiceData): Promise<Buffer> => {
     return new Promise((resolve, reject) => {
         try {
-            const doc = new PDFDocument({   //A new PDF is created here.
+            const doc = new PDFDocument({
                 size: 'A4',
                 margin: 50,
             });
 
-            const chunks: Buffer[] = []; //Small pieces of data from the PDF will be stored here.
+            const chunks: Buffer[] = [];
 
-            //Data arrives in chunks while the PDF is generated.These are stored in an array.
             doc.on('data', (chunk) => {
                 chunks.push(chunk);
             });
 
-            //Merging all chunks together
             doc.on('end', () => {
                 resolve(Buffer.concat(chunks));
             });
 
-            //If there is a problem generating the PDF, an error will be returned.
             doc.on('error', (error) => {
                 reject(error);
             });

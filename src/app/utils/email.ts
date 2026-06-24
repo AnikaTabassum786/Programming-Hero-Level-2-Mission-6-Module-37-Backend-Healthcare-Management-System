@@ -51,7 +51,7 @@ export const sendEmail = async ({subject, templateData, templateName, to, attach
 
         console.log(`Email sent to ${to} : ${info.messageId}`);
     } catch (error : any) {
-        console.log("Email Sending Error", error.message);
+        console.log("Email Sending Error", error);
         throw new AppError(status.INTERNAL_SERVER_ERROR, "Failed to send email");
     }
 }
