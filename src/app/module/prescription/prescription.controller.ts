@@ -44,37 +44,37 @@ const getAllPrescriptions = catchAsync(async (req: Request, res: Response) => {
     });
 });
 
-// const updatePrescription = catchAsync(async (req: Request, res: Response) => {
-//     const user = req.user;
-//     const prescriptionId = req.params.id;
-//     const payload = req.body;
-//     const result = await PrescriptionService.updatePrescription(user, prescriptionId as string, payload);
+const updatePrescription = catchAsync(async (req: Request, res: Response) => {
+    const user = req.user;
+    const prescriptionId = req.params.id;
+    const payload = req.body;
+    const result = await PrescriptionService.updatePrescription(user, prescriptionId as string, payload);
 
-//     sendResponse(res, {
-//         httpStatusCode: httpStatus.OK,
-//         success: true,
-//         message: 'Prescription updated successfully',
-//         data: result
-//     });
-// });
+    sendResponse(res, {
+        httpStatusCode: httpStatus.OK,
+        success: true,
+        message: 'Prescription updated successfully',
+        data: result
+    });
+});
 
 
-// const deletePrescription = catchAsync(async (req: Request, res: Response) => {
-//     const user = req.user;
-//     const prescriptionId = req.params.id;
-//     await PrescriptionService.deletePrescription(user, prescriptionId as string);
+const deletePrescription = catchAsync(async (req: Request, res: Response) => {
+    const user = req.user;
+    const prescriptionId = req.params.id;
+    await PrescriptionService.deletePrescription(user, prescriptionId as string);
 
-//     sendResponse(res, {
-//         httpStatusCode: httpStatus.OK,
-//         success: true,
-//         message: 'Prescription deleted successfully',
-//     });
-// });
+    sendResponse(res, {
+        httpStatusCode: httpStatus.OK,
+        success: true,
+        message: 'Prescription deleted successfully',
+    });
+});
 
 export const PrescriptionController = {
     givePrescription,
     myPrescriptions,
     getAllPrescriptions,
-    // updatePrescription,
-    // deletePrescription
+    updatePrescription,
+    deletePrescription
 };

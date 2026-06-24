@@ -28,18 +28,18 @@ router.post(
     PrescriptionController.givePrescription
 )
 
-// router.patch(
-//     '/:id',
-//     checkAuth(Role.DOCTOR),
-//     validateRequest(PrescriptionValidation.updatePrescriptionZodSchema),
-//     PrescriptionController.updatePrescription
-// )
+router.patch(
+    '/:id',
+    checkAuth(Role.DOCTOR),
+    validateRequest(PrescriptionValidation.updatePrescriptionZodSchema),
+    PrescriptionController.updatePrescription
+)
 
-// router.delete(
-//     '/:id',
-//     checkAuth(Role.DOCTOR),
-//     PrescriptionController.deletePrescription
-// )
+router.delete(
+    '/:id',
+    checkAuth(Role.DOCTOR),
+    PrescriptionController.deletePrescription
+)
 
 
 export const PrescriptionRoutes = router;

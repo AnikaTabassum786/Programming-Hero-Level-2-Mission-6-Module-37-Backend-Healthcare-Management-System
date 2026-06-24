@@ -7,7 +7,7 @@ import { prisma } from "../../lib/prisma";
 import { ICreatePrescriptionPayload } from "./prescription.interface";
 import { Role } from "../../../generated/prisma/enums";
 import { generatePrescriptionPDF } from "./prescription.utils";
-import { uploadFileToCloudinary } from "../../../config/cloudinary.config";
+import { deleteFileFromCloudinary, uploadFileToCloudinary } from "../../../config/cloudinary.config";
 import { sendEmail } from "../../utils/email";
 
 //The function of this API is to enable a doctor to create a prescription for an appointment, generate a PDF, upload it to Cloudinary, and send an email to the patient.
@@ -125,7 +125,7 @@ const givePrescription = async (user: IRequestUser, payload: ICreatePrescription
                 ]
             })
         } catch (error) {
-            console.log("Failed To send email notification for prescription", error); 
+            console.log("Failed To send email notification for prescription", error);
         }
 
         return updatedPrescription; //The prescription will remain saved even if the email is not sent.
@@ -198,178 +198,187 @@ const getAllPrescriptions = async () => {
     return result;
 };
 
-// const updatePrescription = async (user: IRequestUser, prescriptionId: string, payload: any) => {
-//     // Verify user exists
-//     const isUserExists = await prisma.user.findUnique({
-//         where: {
-//             email: user?.email
-//         }
-//     });
+//The function of this API is to allow a doctor to update their prescription. Upon updating, a new PDF will be generated and uploaded to Cloudinary, the old PDF will be deleted, and an email will be sent to the patient.
 
-//     if (!isUserExists) {
-//         throw new AppError(status.NOT_FOUND, "User not found");
-//     }
+const updatePrescription = async (user: IRequestUser, prescriptionId: string, payload: any) => {
+    // Verify user exists
+    const isUserExists = await prisma.user.findUnique({ //Check if the user exists
+        where: {
+            email: user?.email
+        }
+    });
 
-//     // Fetch current prescription data
-//     const prescriptionData = await prisma.prescription.findUniqueOrThrow({
-//         where: {
-//             id: prescriptionId
-//         },
-//         include: {
-//             doctor: true,
-//             patient: true,
-//             appointment: {
-//                 include: {
-//                     schedule: true
-//                 }
-//             }
-//         }
-//     });
+    if (!isUserExists) {
+        throw new AppError(status.NOT_FOUND, "User not found"); //If user not exist
+    }
 
-//     // Verify the user is the doctor for this prescription
-//     if (!(user?.email === prescriptionData.doctor.email)) {
-//         throw new AppError(status.BAD_REQUEST, "This is not your prescription!")
-//     }
+    // Fetch current prescription data.It is fetching all the prescription data.
+    const prescriptionData = await prisma.prescription.findUniqueOrThrow({ 
+        where: {
+            id: prescriptionId
+        },
+        include: {
+            doctor: true,
+            patient: true,
+            appointment: {
+                include: {
+                    schedule: true
+                }
+            }
+        }
+    });
 
-//     // Prepare updated data
-//     const updatedInstructions = payload.instructions || prescriptionData.instructions;
-//     const updatedFollowUpDate = payload.followUpDate
-//         ? new Date(payload.followUpDate)
-//         : prescriptionData.followUpDate;
+    // Verify the user is the doctor for this prescription
+    if (!(user?.email === prescriptionData.doctor.email)) {
+        throw new AppError(status.BAD_REQUEST, "This is not your prescription!")
+    }
 
-//     // Step 1: Generate new PDF with updated data
-//     const pdfBuffer = await generatePrescriptionPDF({
-//         doctorName: prescriptionData.doctor.name,
-//         doctorEmail: prescriptionData.doctor.email,
-//         patientName: prescriptionData.patient.name,
-//         patientEmail: prescriptionData.patient.email,
-//         appointmentDate: prescriptionData.appointment.schedule.startDateTime,
-//         instructions: updatedInstructions,
-//         followUpDate: updatedFollowUpDate,
-//         prescriptionId: prescriptionData.id,
-//         createdAt: prescriptionData.createdAt,
-//     });
+    // Prepare updated data
+    // If new instructions are sent, it will use those. If none are sent,it will retain the old value
+    const updatedInstructions = payload.instructions || prescriptionData.instructions;
+    const updatedFollowUpDate = payload.followUpDate
+        ? new Date(payload.followUpDate)
+        : prescriptionData.followUpDate;
 
-//     // Step 2: Upload new PDF to Cloudinary
-//     const fileName = `prescription-updated-${Date.now()}.pdf`;
-//     const uploadedFile = await uploadFileToCloudinary(pdfBuffer, fileName);
-//     const newPdfUrl = uploadedFile.secure_url;
+    // Step 1: Generate new PDF with updated data
+    //A new PDF is being created with updated prescription information.
+    const pdfBuffer = await generatePrescriptionPDF({
+        doctorName: prescriptionData.doctor.name,
+        doctorEmail: prescriptionData.doctor.email,
+        patientName: prescriptionData.patient.name,
+        patientEmail: prescriptionData.patient.email,
+        appointmentDate: prescriptionData.appointment.schedule.startDateTime,
+        instructions: updatedInstructions,
+        followUpDate: updatedFollowUpDate,
+        prescriptionId: prescriptionData.id,
+        createdAt: prescriptionData.createdAt,
+    });
 
-//     // Step 3: Delete old PDF from Cloudinary if it exists
-//     if (prescriptionData.pdfUrl) {
-//         try {
-//             await deleteFileFromCloudinary(prescriptionData.pdfUrl);
-//         } catch (deleteError) {
-//             // Log but don't fail
-//             console.error("Failed to delete old PDF from Cloudinary:", deleteError);
-//         }
-//     }
+    // Step 2: Upload new PDF to Cloudinary
+   
+    const fileName = `prescription-updated-${Date.now()}.pdf`;
+    const uploadedFile = await uploadFileToCloudinary(pdfBuffer, fileName);
+    const newPdfUrl = uploadedFile.secure_url;
 
-//     // Step 4: Update prescription in database
-//     const result = await prisma.prescription.update({
-//         where: {
-//             id: prescriptionId
-//         },
-//         data: {
-//             instructions: updatedInstructions,
-//             followUpDate: updatedFollowUpDate,
-//             pdfUrl: newPdfUrl
-//         },
-//         include: {
-//             patient: true,
-//             doctor: true,
-//             appointment: {
-//                 include: {
-//                     schedule: true
-//                 }
-//             },
+    // Step 3: Delete old PDF from Cloudinary if it exists
+    //If the deletion fails,It will only log the error to the console.It will not stop the prescription update.
+    if (prescriptionData.pdfUrl) {
+        try {
+            await deleteFileFromCloudinary(prescriptionData.pdfUrl);
+        } catch (deleteError) {
+            // Log but don't fail
+            console.error("Failed to delete old PDF from Cloudinary:", deleteError);
+        }
+    }
 
-//         }
-//     });
+    // Step 4: Update prescription in database
+    //Update Instructions,Follow Up Date,PDF URL
+ 
+    const result = await prisma.prescription.update({
+        where: {
+            id: prescriptionId
+        },
+        data: {
+            instructions: updatedInstructions,
+            followUpDate: updatedFollowUpDate,
+            pdfUrl: newPdfUrl
+        },
+        include: {
+            patient: true,
+            doctor: true,
+            appointment: {
+                include: {
+                    schedule: true
+                }
+            },
 
-//     // Step 5: Send updated prescription email to patient
-//     try {
-//         await sendEmail({
-//             to: result.patient.email,
-//             subject: `Your Prescription has been Updated by ${result.doctor.name}`,
-//             templateName: "prescription",
-//             templateData: {
-//                 patientName: result.patient.name,
-//                 doctorName: result.doctor.name,
-//                 specialization: "Healthcare Provider",
-//                 prescriptionId: result.id,
-//                 appointmentDate: new Date(result.appointment.schedule.startDateTime).toLocaleString(),
-//                 issuedDate: new Date(result.createdAt).toLocaleDateString(),
-//                 followUpDate: new Date(result.followUpDate).toLocaleDateString(),
-//                 instructions: result.instructions,
-//                 pdfUrl: newPdfUrl
-//             },
-//             attachments: [
-//                 {
-//                     filename: `Prescription-${result.id}.pdf`,
-//                     content: pdfBuffer,
-//                     contentType: "application/pdf"
-//                 }
-//             ]
-//         });
-//     } catch (emailError) {
-//         // Log email error but don't fail the prescription update
-//         console.error("Failed to send updated prescription email:", emailError);
-//     }
+        }
+    });
 
-//     return result;
-// };
+    // Step 5: Send updated prescription email to patient
+    try {
+        await sendEmail({
+            to: result.patient.email,
+            subject: `Your Prescription has been Updated by ${result.doctor.name}`,
+            templateName: "prescription",
+            templateData: {
+                patientName: result.patient.name,
+                doctorName: result.doctor.name,
+                specialization: "Healthcare Provider",
+                prescriptionId: result.id,
+                appointmentDate: new Date(result.appointment.schedule.startDateTime).toLocaleString(),
+                issuedDate: new Date(result.createdAt).toLocaleDateString(),
+                followUpDate: new Date(result.followUpDate).toLocaleDateString(),
+                instructions: result.instructions,
+                pdfUrl: newPdfUrl
+            },
+            //The patient will also receive a PDF file along with the email.
+            attachments: [
+                {
+                    filename: `Prescription-${result.id}.pdf`,
+                    content: pdfBuffer,
+                    contentType: "application/pdf"
+                }
+            ]
+        });
+    } catch (emailError) {
+        // Log email error but don't fail the prescription update
+        console.error("Failed to send updated prescription email:", emailError);
+    }
 
-// const deletePrescription = async (user: IRequestUser, prescriptionId: string): Promise<void> => {
-//     // Verify user exists
-//     const isUserExists = await prisma.user.findUnique({
-//         where: {
-//             email: user?.email
-//         }
-//     });
+    return result;
+};
 
-//     if (!isUserExists) {
-//         throw new AppError(status.NOT_FOUND, "User not found");
-//     }
+const deletePrescription = async (user: IRequestUser, prescriptionId: string): Promise<void> => {
+    // Verify user exists
+    const isUserExists = await prisma.user.findUnique({
+        where: {
+            email: user?.email
+        }
+    });
 
-//     // Fetch prescription data
-//     const prescriptionData = await prisma.prescription.findUniqueOrThrow({
-//         where: {
-//             id: prescriptionId
-//         },
-//         include: {
-//             doctor: true
-//         }
-//     });
+    if (!isUserExists) {
+        throw new AppError(status.NOT_FOUND, "User not found");
+    }
 
-//     // Verify the user is the doctor for this prescription
-//     if (!(user?.email === prescriptionData.doctor.email)) {
-//         throw new AppError(status.BAD_REQUEST, "This is not your prescription!")
-//     }
+    // Fetch prescription data
+    const prescriptionData = await prisma.prescription.findUniqueOrThrow({
+        where: {
+            id: prescriptionId
+        },
+        include: {
+            doctor: true
+        }
+    });
 
-//     // Delete PDF from Cloudinary if it exists
-//     if (prescriptionData.pdfUrl) {
-//         try {
-//             await deleteFileFromCloudinary(prescriptionData.pdfUrl);
-//         } catch (deleteError) {
-//             // Log but don't fail - still delete from database
-//             console.error("Failed to delete PDF from Cloudinary:", deleteError);
-//         }
-//     }
+    // Verify the user is the doctor for this prescription
+    if (!(user?.email === prescriptionData.doctor.email)) {
+        throw new AppError(status.BAD_REQUEST, "This is not your prescription!")
+    }
 
-//     // Delete prescription from database
-//     await prisma.prescription.delete({
-//         where: {
-//             id: prescriptionId
-//         }
-//     });
-// }
+    // Delete PDF from Cloudinary if it exists
+    if (prescriptionData.pdfUrl) {
+        try {
+            await deleteFileFromCloudinary(prescriptionData.pdfUrl);
+        } catch (deleteError) {
+            // Log but don't fail - still delete from database
+            console.error("Failed to delete PDF from Cloudinary:", deleteError);
+        }
+    }
+
+    // Delete prescription from database
+    await prisma.prescription.delete({
+        where: {
+            id: prescriptionId
+        }
+    });
+}
 
 
 export const PrescriptionService = {
     givePrescription,
     myPrescriptions,
     getAllPrescriptions,
-    // updatePrescription,
-    // deletePrescription
+    updatePrescription,
+    deletePrescription
 }
