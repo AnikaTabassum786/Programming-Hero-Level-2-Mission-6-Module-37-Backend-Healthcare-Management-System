@@ -1,22 +1,18 @@
-
-
 import { Request, Response } from "express";
 import { catchAsync } from "../../shared/catchAsync";
 import { envVars } from "../../../config/env";
 import status from "http-status";
-import Stripe from "stripe";
+
 import { PaymentService } from "./payment.service";
 import { sendResponse } from "../../shared/sendResponse";
+import { stripe } from "../../../config/stripe.config";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+
 const handleStripeWebhookEvent = catchAsync(async (req : Request, res : Response) => {
+    const signature = req.headers['stripe-signature'] as string
+    const webhookSecret = envVars.STRIPE.STRIPE_WEBHOOK_SECRET;
 
-   
-    const signature = req.headers['stripe-signature'] as string  //Signature from Stripe
-    const webhookSecret = envVars.STRIPE.STRIPE_WEBHOOK_SECRET;  //Webhook secret in Stripe Dashboard
-
-
-    //If signature or webhookSecret any of them are missing, the webhook will not process.
     if(!signature || !webhookSecret){
         console.error("Missing Stripe signature or webhook secret");
         return res.status(status.BAD_REQUEST).json({message : "Missing Stripe signature or webhook secret"})
@@ -25,14 +21,14 @@ const handleStripeWebhookEvent = catchAsync(async (req : Request, res : Response
     let event;
 
     try {
-        event = Stripe.webhooks.constructEvent(req.body, signature, webhookSecret); //Here Stripe verifies the request. 
+        event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
     } catch (error : any) {
-        console.error("Error processing Stripe webhook:", error); //If the request has been modified or is fake, an error will be thrown.
+        console.error("Error processing Stripe webhook:", error);
         return res.status(status.BAD_REQUEST).json({message : "Error processing Stripe webhook"})
     }
 
     try {
-        const result = await PaymentService.handlerStripeWebhookEvent(event); //Verified event is  sent to the service layer.
+        const result = await PaymentService.handlerStripeWebhookEvent(event);
 
         sendResponse(res, {
             httpStatusCode : status.OK,
