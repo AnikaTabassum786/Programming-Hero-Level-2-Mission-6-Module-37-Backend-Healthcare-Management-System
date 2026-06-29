@@ -117,7 +117,7 @@ const changeUserStatus = async (user: IRequestUser, payload: IChangeUserStatusPa
 
     const isAdminExists = await prisma.admin.findUniqueOrThrow({ //Here, information about the currently logged-in admin is being retrieved from the database.
         where: {
-            email: user.email 
+            email: user.email
         },
         include: {
             user: true,
@@ -173,7 +173,7 @@ const changeUserRole = async (user: IRequestUser, payload: IChangeUserRolePayloa
 
     // 3. Role of Patient and Doctor user cannot be changed by anyone. If needed, they have to be deleted and recreated with new role.
 
-    const isSuperAdminExists = await prisma.admin.findFirstOrThrow({
+    const isSuperAdminExists = await prisma.admin.findFirstOrThrow({ //Check whether the logged-in user is actually a SUPER_ADMIN.
         where: {
             email: user.email,
             user: {
@@ -185,25 +185,40 @@ const changeUserRole = async (user: IRequestUser, payload: IChangeUserRolePayloa
         }
     });
 
-    const { userId, role } = payload;
+    const { userId, role } = payload; //Extracting data from the request body
 
+    //Identifying the user whose role is to be changed
     const userToChangeRole = await prisma.user.findUniqueOrThrow({
         where: {
             id: userId,
         }
     })
 
+    //You cannot change your own role yourself.
     const selfRoleChange = isSuperAdminExists.userId === userId;
 
     if (selfRoleChange) {
         throw new AppError(status.BAD_REQUEST, "You cannot change your own role");
     }
 
+    // Because, according to system rules:
+
+    // Doctor → Admin
+    // Patient → Doctor
+    // Patient → Admin
+
+    // These role changes are not allowed.
+
+    // If a change is required:
+
+    // The old account must be deleted.
+    // A new account must be created with the new role.
+
     if (userToChangeRole.role === Role.DOCTOR || userToChangeRole.role === Role.PATIENT) {
         throw new AppError(status.BAD_REQUEST, "You cannot change the role of doctor or patient user. If you want to change the role of doctor or patient user, you have to delete the user and recreate with new role");
     }
 
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await prisma.user.update({ //It will update if all conditions are met.
         where: {
             id: userId,
         },
