@@ -28,7 +28,7 @@ app.use(cors({
   origin:[envVars.FRONTEND_URL,envVars.BETTER_AUTH_URL,"http://localhost:5000","http://localhost:3000"],
   credentials:true,
   methods:["GET","POST","DELETE","PATCH"],
-  allowedHeaders:["content-Type","Authorization"]
+  allowedHeaders:["Content-Type","Authorization"]
 }))
 
 
